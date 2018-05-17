@@ -1,7 +1,7 @@
 //NRF.setLowPowerConnection(true);
 var pressCount = 0;
 var nrfEnabled = true;
-var sleepTime = 15000;
+var sleepTime = 1500;
 var persistBroadcast = 1500;
 var timerId = null;
 var adTimerId = null;
@@ -69,7 +69,7 @@ function advertise() {
   var ad = getAdvertising();
   var md = getManufacturerData();
   console.log('ad');
-  NRF.setAdvertising(ad,md);
+  NRF.setAdvertising(ad);
   setSleep();
 }
 
@@ -89,9 +89,11 @@ setWatch(function() {
       clearTimeout(adTimerId);
       console.log('adTimer '+adTimerId+' cleared');
     }
+    
+    broadcastBeacon(false);
 
-    broadcastBeacon(true);
-    adTimer = setTimeout(advertise,persistBroadcast);
+    //broadcastBeacon(true);
+    //adTimer = setTimeout(advertise,persistBroadcast);
 
   } catch(e) {
     console.log(e);
@@ -112,6 +114,6 @@ function broadcastBeacon(stayAwake) {
   }
 }
 
-setInterval(broadcastBeacon,beaconInterval);
+//setInterval(broadcastBeacon,beaconInterval);
 
-broadcastBeacon();
+//broadcastBeacon();
