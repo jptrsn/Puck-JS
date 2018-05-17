@@ -1,43 +1,47 @@
 var controls = require("ble_hid_controls");
+NRF.setAdvertising(undefined,{name: "Media Button"});
 NRF.setServices(undefined, { hid : controls.report });
 
 var connected = true;
 var lastDeviceId, lastErr, risingOrientation;
 var orientationMidpoint = -1500;
 var knownDeviceId = "00:1a:7d:da:71:11";
+const defaultTimeout = 750;
 
-NRF.on("connect", function (id) {lastDeviceId = id.split(" ")[0];
+NRF.on("connect", function (id) {
+  lastDeviceId = id.split(" ")[0];
   connected = true;
-  NRF.setLowPowerConnection(true);
+  //NRF.setLowPowerConnection(true);
   blinkLeds(2,1500);
 });
 
 NRF.on("disconnect", function () {
   connected = false;
+  NRF.sleep();
   blinkLeds(1,1500);
 });
 
 
 function activeButtonHandler(e) {try {
     var len = e.time - e.lastTime;
-    console.log('activeButtonHandler', len);
+    //console.log('activeButtonHandler', len);
     var orientationDelta = getOrientationDelta();
     if (!orientationDelta && len > 0.3 && len < 2) {
       if (getStaticOrientation()) {
-        console.log('next');
+        //console.log('next');
         controls.next();
         blinkLeds(5,100);
       } else {
-        console.log('previous');
+        //console.log('previous');
         controls.prev();
         blinkLeds(5,100);
       }
     } else if (len <= 0.3) {
-      console.log('playpause');
+      //console.log('playpause');
       controls.playpause();
       blinkLeds(2,100);
     } else if (!orientationDelta) {
-      console.log('disconnecting');
+      //console.log('disconnecting');
       NRF.disconnect(function(reason){
         blinkLeds(4,1000);
       });
@@ -47,34 +51,59 @@ function activeButtonHandler(e) {try {
   }
 }
 
-function handle(e) {blinkLeds(1,150);
-  lastErr = e;
+function handle(e) {
+  blinkLeds(1,150);
+  lastErr = JSON.stringify(e);
   console.log(e.msg);
 }
 
-function lastError() {console.log(lastErr);}
+function lastError() {
+  if (!lastErr) {
+    return 'Not found';
+  } else {
+    return JSON.parse(lastErr);
+  }
+}
+
+
+var lockService = {
+  isLocked : false,
+  lock: function() {
+    lockService.isLocked = true;
+  },
+  unlock: function() {
+    lockService.isLocked = false;
+  }
+};
 
 function checkVolumeCommand() {
   var delta = getOrientationDelta();
-  console.log('delta',delta);
+  if (lockService.isLocked) {
+    return setTimeout(checkVolumeCommand,defaultTimeout);
+  }
+  //console.log('delta',delta);
   if (delta) {
     var btn = digitalRead(BTN);
-    console.log(btn);
     if (btn) {
+      lockService.lock();
       if (delta > 0) {
-        controls.volumeUp();
+        controls.volumeUp(lockService.unlock);
+        //console.log('+');
         blinkLeds(2,100);
       } else if (delta < 0) {
-        controls.volumeDown();
+        controls.volumeDown(lockService.unlock);
+        //console.log('-');
         blinkLeds(1,100);
       }
-      setTimeout(checkVolumeCommand,250);
+      setTimeout(checkVolumeCommand,defaultTimeout);
     }
   }
 }
 
-function wakeupButtonHandler(e) {try {
-    console.log('wakeupButtonHandler');
+function wakeupButtonHandler(e) {
+  try {
+    //console.log('wakeupButtonHandler');
+    NRF.wake();
     var len = e.time - e.lastTime;
     if (len < 2) {
       setLeds(3);
@@ -98,7 +127,7 @@ function blinkLeds(c,d,optCallback) {setLeds(c);
     if (optCallback) {
       optCallback();
     }
-  },d || 500);
+  },d || defaultTimeout);
 }
 
 function setLeds(color) {digitalWrite([LED3,LED2,LED1], color);}
@@ -107,7 +136,7 @@ function connectTo(id) {setLeds(3);
   NRF.connect(id).then(function(ev){
     blinkLeds(2,500);
     setLeds(0);
-    console.log(ev);
+    //console.log(ev);
   }, function(ev) {
     blinkLeds(1,250);
   });}
@@ -117,10 +146,10 @@ function fallingEdgeClickHandler(e) {
     var len = e.time - e.lastTime;
     blinkLeds(2,100);
     if (!connected) {
-      console.log('disconnected');
+      //console.log('disconnected');
       wakeupButtonHandler(e);
     } else {
-      console.log('connected');
+      //console.log('connected');
       activeButtonHandler(e);
     }
   } catch(err) {
@@ -146,8 +175,9 @@ function getStaticOrientation() {
   return (o.z > orientationMidpoint);
 }
 
-function risingEdgeClickHandler(e) {risingOrientation = Puck.mag();
-  setTimeout(checkVolumeCommand,250);
+function risingEdgeClickHandler(e) {
+  risingOrientation = Puck.mag();
+  setTimeout(checkVolumeCommand,defaultTimeout);
 }
 
 setWatch(fallingEdgeClickHandler, D0, { repeat:true, edge:'falling', debounce : 50 });

@@ -3,12 +3,10 @@ var sleepFlag = false;
 var connected = false;
 var lastDeviceId;
 
+NRF.setAdvertising(
+  {0x0590:[pressCount]},
+  {name: "Puck", uart: true});
 
-function test() {
-  return 'test';
-}
-
-NRF.setAdvertising({},{name: "Puck", uart: true});
 NRF.setLowPowerConnection(true);
 
 function setLeds(c) {
@@ -27,14 +25,22 @@ function blinkLeds(c, d, optCallback) {
 
 function wakeupAndAdvertise() {
   //NRF.wake();
+  
   pressCount++;
-  console.log(pressCount);
-
-  NRF.setAdvertising({
+  var m = Puck.mag();
+  var l = Math.round(Puck.light()*100);
+  
+  var env = {
     0x180F : [Puck.getBatteryPercentage()],
     0x1809 : [Math.round(E.getTemperature())],
-    0xFFFF : [pressCount]
-  });
+    0x2A77 : [l],
+    //0x2AA1 : [m.x>>8,m.x,m.y>>8,m.y,m.z>>8,m.z],
+    0x0590 : [pressCount]
+  };
+
+  console.log(env);
+
+  NRF.setAdvertising(env);
 
   sleepFlag = true;
   blinkLeds(3,150);
@@ -78,11 +84,12 @@ function connectToLastDevice() {
 
 function handleClick(ev) {
   console.log('click');
+  blinkLeds(7,150);
   //if (sleepFlag) {
   //  return cancelSleep();
   //}
   if (connected) {
-    blinkLeds(7,50);
+    
     //if (sleepFlag) {
     //  console.log('cancelling sleep');
     //  cancelSleep();
